@@ -1,34 +1,58 @@
 import torch
-import pytorc_lightning as pl
+from torch import nn
+from torch.nn import functional as F
+import pytorch_lightning as pl
+from torch_geometric.nn import GCNConv
+from torch_sparse import SparseTensor
 
-class LightingModelWrapper(pl.LightningModule):
-    def __init__(self, model, lr, weight_decay, evaluator=None):
+from src.architectures import *
+
+class GCN(pl.LightningModule):
+    def __init__(self, input_dim, hidden_dim, output_dim, n_layers, dropout, lr, weight_decay, evaluator=None):
         super().__init__()
-        self.model = model
-        self.lr = lr
-        self.weight_decay = weight_decay
+        self.save_hyperparameters()
+
         self.evaluator = evaluator
+        self.convs = torch.nn.ModuleList()
+        self.convs.append(GCNConv(input_dim, hidden_dim, cached=True))
+        self.bns = torch.nn.ModuleList()
+        self.bns.append(torch.nn.BatchNorm1d(hidden_dim))
+        for _ in range(n_layers - 2):
+            self.convs.append(GCNConv(hidden_dim, hidden_dim, cached=True))
+            self.bns.append(torch.nn.BatchNorm1d(hidden_dim))
+        self.convs.append(GCNConv(hidden_dim, output_dim, cached=True))
+
+    def forward(self, x, adj_t):
+        for i, conv in enumerate(self.convs[:-1]):
+            x = conv(x, adj_t)
+            x = self.bns[i](x)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.convs[-1](x, adj_t)
+        return x.log_softmax(dim=-1)
 
     def training_step(self, batch, batch_idx):
-        xs, y = batch["xs"], batch["y"].long()
-        out = self.model(xs)
-        loss = nn.functional.nll_loss(out, y)
+        edge_index, x, y, indices = batch["edge_index"], batch["x"], batch["y"].long(), batch["indices"]
+        adj_t = SparseTensor(row=edge_index[0], col=edge_index[1]).t()  # TODO check that conversion is OKAY
+        out = self.forward(x, adj_t)
+        loss = nn.functional.nll_loss(out[indices], y[indices])
         self.log("train_loss", loss)
 
         return loss
 
     def predict(self, batch):
-        xs, y = batch["xs"], batch["y"]
-        out = self.model(xs)
-        pred = out.max(1)[1]
+        edge_index, x, y, indices = batch["edge_index"], batch["x"], batch["y"].long(), batch["indices"]
+        adj_t = SparseTensor(row=edge_index[0], col=edge_index[1]).t()  # TODO check that conversion is OKAY
+        out = self.forward(x, adj_t)
+        y_pred = out.max(1)[1]
 
-        return pred, y
+        return y_pred[indices], y[indices]
 
     def evaluate(self, y_pred, y_true):
         if self.evaluator:
             acc = self.evaluator.eval({"y_true": y_true.unsqueeze(1), "y_pred": y_pred.unsqueeze(1)})["acc"]
         else:
-            acc = y_pred.eq(y_true.squeeze()).sum().item() / y_pred.shape[0]
+            acc = y_pred.eq(y_true.squeeze()).sum().item() / y_pred.shape[0] # TODO Maybe use torch metrics
 
         return acc
 
@@ -53,5 +77,5 @@ class LightingModelWrapper(pl.LightningModule):
         self.log("val_acc", self.evaluate(y_pred, y_true))
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
         return optimizer

@@ -14,12 +14,12 @@ import seml
 from seml.utils import flatten
 
 from src.datasets import get_dataset
-from src.models.standard_net.StandardNet import StandardNet
+from src.models.gcn.GCN import GCN
 
 ex = Experiment()
 seml.setup_logger(ex)
 
-project_name = 'project-template'
+project_name = 'dynamic-graff'
 
 @ex.post_run_hook
 def collect_stats(_run):
@@ -50,8 +50,8 @@ def run(# Dataset parameters,
         architecture_name,
 
         # Training parameters
-        learning_rate,
-        regularization_factor,
+        lr,
+        weight_decay,
         patience,
         max_epochs,
         ):
@@ -66,19 +66,19 @@ def run(# Dataset parameters,
                                             split_index=split_index,
                                             split_ratio=split_ratio,
                                             seed=seed_dataset,)
-    # input_dims, output_dim = data_module.dims, 10 # TODO change to be automatic
-    input_dims, output_dim = data_module.dims, data_module.num_classes # TODO change to be automatic
+    # input_dims, output_dim = data_module.dims, data_module.num_classes # TODO change to be automatic
 
     #################
     ## Train model ##
     #################
-    params_dict= {'input_dims': input_dims,
+    params_dict= {'input_dim': input_dims,
+                  'hidden_dim': hidden_dim,
                   'output_dim': output_dim,
-                  'architecture_name': architecture_name,
-                  "learning_rate": learning_rate,
-                  "regularization_factor": regularization_factor,
+                  'n_layers': n_layers,
+                  "learning_rate": lr,
+                  "weight_decay": weight_decay,
                   'seed': seed_model}
-    model = StandardNet(**params_dict)
+    model = GCN(**params_dict)
 
     random_name = str(random.randint(0, 1e6))
     model_path = f"{directory_model}/stdnet-{random_name}"
