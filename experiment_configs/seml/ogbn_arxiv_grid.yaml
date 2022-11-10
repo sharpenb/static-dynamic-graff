@@ -1,0 +1,44 @@
+program: src/run.py
+method: random
+parameters:
+  model:
+    value: "sgraff"
+  dataset:
+    value: "ogbn-arxiv"
+  num_runs:
+    value: 10
+  patience:
+    value: 50
+  num_powers:
+    values: [1, 2, 3, 4]
+  hidden_dim:
+    values: [64, 128, 256, 512, 1024]
+  num_layers:
+    values: [1, 2]
+  input_dropout:
+    distribution: uniform
+    min: 0
+    max: 1
+  dropout:
+    distribution: uniform
+    min: 0
+    max: 1
+  lr:
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.1
+  adj_norm:
+    values: ["row", "sym"]
+  W_type:
+    values: ["diag_dom"]
+  omega_type:
+    values: ["identity", "scalar"]
+entity: graph_neural_diffusion
+project: scalable_graff
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args}
+  - --full_batch
+  - --preprocess
