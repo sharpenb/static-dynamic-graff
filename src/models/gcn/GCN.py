@@ -5,12 +5,12 @@ import pytorch_lightning as pl
 from torch_geometric.nn import GCNConv
 from torch_sparse import SparseTensor
 
-from src.architectures import *
 
 class GCN(pl.LightningModule):
-    def __init__(self, input_dim, hidden_dim, output_dim, n_layers, dropout, lr, weight_decay, evaluator=None):
+    def __init__(self, input_dim, hidden_dim, output_dim, n_layers, dropout, lr, weight_decay, seed, evaluator=None):
         super().__init__()
         self.save_hyperparameters()
+        torch.cuda.manual_seed(seed)
 
         self.evaluator = evaluator
         self.convs = torch.nn.ModuleList()
@@ -27,12 +27,12 @@ class GCN(pl.LightningModule):
             x = conv(x, adj_t)
             x = self.bns[i](x)
             x = F.relu(x)
-            x = F.dropout(x, p=self.dropout, training=self.training)
+            x = F.dropout(x, p=self.hparams.dropout, training=self.training)
         x = self.convs[-1](x, adj_t)
         return x.log_softmax(dim=-1)
 
     def training_step(self, batch, batch_idx):
-        edge_index, x, y, indices = batch["edge_index"], batch["x"], batch["y"].long(), batch["indices"]
+        edge_index, x, y, indices = batch["edge_index"].squeeze(), batch["x"].squeeze(), batch["y"].long().squeeze(), batch["indices"].squeeze()
         adj_t = SparseTensor(row=edge_index[0], col=edge_index[1]).t()  # TODO check that conversion is OKAY
         out = self.forward(x, adj_t)
         loss = nn.functional.nll_loss(out[indices], y[indices])
@@ -41,7 +41,7 @@ class GCN(pl.LightningModule):
         return loss
 
     def predict(self, batch):
-        edge_index, x, y, indices = batch["edge_index"], batch["x"], batch["y"].long(), batch["indices"]
+        edge_index, x, y, indices = batch["edge_index"].squeeze(), batch["x"].squeeze(), batch["y"].long().squeeze(), batch["indices"].squeeze()
         adj_t = SparseTensor(row=edge_index[0], col=edge_index[1]).t()  # TODO check that conversion is OKAY
         out = self.forward(x, adj_t)
         y_pred = out.max(1)[1]
@@ -77,5 +77,5 @@ class GCN(pl.LightningModule):
         self.log("val_acc", self.evaluate(y_pred, y_true))
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
         return optimizer

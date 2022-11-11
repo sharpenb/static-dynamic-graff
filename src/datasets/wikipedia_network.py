@@ -23,12 +23,9 @@ class WikipediaNetworkDataModule(LightningDataModule):
                  seed,):
         super().__init__()
         self.name = name
-        if self.name == "chameleon":
-            self.n_nodes = 2277
-        elif self.name == "squirrel":
-            self.n_nodes = 5201
-        else:
-            raise NotImplementedError
+        self.input_dim = None
+        self.output_dim = None
+        self.n_nodes = None
         self.data_dir = data_dir
         self.split_type = split_type
         self.split_index = split_index
@@ -61,6 +58,9 @@ class WikipediaNetworkDataModule(LightningDataModule):
         self.train_dataset = NodeClassificationDataset(edge_index=edge_index, x=x, y=y, indices=train_mask, )
         self.val_dataset = NodeClassificationDataset(edge_index=edge_index, x=x, y=y, indices=val_mask, )
         self.test_dataset = NodeClassificationDataset(edge_index=edge_index, x=x, y=y, indices=test_mask, )
+        self.n_nodes = x.shape[-2]
+        self.input_dim = x.shape[-1]
+        self.output_dim = int(y.max() + 1)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset)
