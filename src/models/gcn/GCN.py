@@ -13,36 +13,36 @@ class GCN(pl.LightningModule):
         torch.cuda.manual_seed(seed)
 
         self.evaluator = evaluator
-        self.convs = torch.nn.ModuleList()
-        self.convs.append(GCNConv(input_dim, hidden_dim, cached=True))
+        self.gcn_steps = torch.nn.ModuleList()
+        self.gcn_steps.append(GCNConv(input_dim, hidden_dim, cached=True))
         self.bns = torch.nn.ModuleList()
         self.bns.append(torch.nn.BatchNorm1d(hidden_dim))
         for _ in range(n_layers - 2):
-            self.convs.append(GCNConv(hidden_dim, hidden_dim, cached=True))
+            self.gcn_steps.append(GCNConv(hidden_dim, hidden_dim, cached=True))
             self.bns.append(torch.nn.BatchNorm1d(hidden_dim))
-        self.convs.append(GCNConv(hidden_dim, output_dim, cached=True))
+        self.gcn_steps.append(GCNConv(hidden_dim, output_dim, cached=True))
 
     def forward(self, x, adj_t):
-        for i, conv in enumerate(self.convs[:-1]):
-            x = conv(x, adj_t)
+        for i, gcn_step in enumerate(self.gcn_steps[:-1]):
+            x = gcn_step(x, adj_t)
             x = self.bns[i](x)
             x = F.relu(x)
             x = F.dropout(x, p=self.hparams.dropout, training=self.training)
-        x = self.convs[-1](x, adj_t)
+        x = self.gcn_steps[-1](x, adj_t)
         return x.log_softmax(dim=-1)
 
     def training_step(self, batch, batch_idx):
         edge_index, x, y, indices = batch["edge_index"].squeeze(), batch["x"].squeeze(), batch["y"].long().squeeze(), batch["indices"].squeeze()
-        adj_t = SparseTensor(row=edge_index[0], col=edge_index[1]).t()  # TODO check that conversion is OKAY
+        adj_t = SparseTensor(row=edge_index[0], col=edge_index[1]).t()
         out = self.forward(x, adj_t)
-        loss = nn.functional.nll_loss(out[indices], y[indices])
+        loss = nn.functional.nll_loss(out[indices], y[indices]) # TODO make a function for the loss
         self.log("train_loss", loss)
 
         return loss
 
     def predict(self, batch):
         edge_index, x, y, indices = batch["edge_index"].squeeze(), batch["x"].squeeze(), batch["y"].long().squeeze(), batch["indices"].squeeze()
-        adj_t = SparseTensor(row=edge_index[0], col=edge_index[1]).t()  # TODO check that conversion is OKAY
+        adj_t = SparseTensor(row=edge_index[0], col=edge_index[1]).t()
         out = self.forward(x, adj_t)
         y_pred = out.max(1)[1]
 
