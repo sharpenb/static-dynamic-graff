@@ -41,7 +41,7 @@ def run(# Dataset parameters,
         dataset_name="cora",
         split_type="geom-gcn",
         split_index=0,
-        split_ratio=[.5, .25, .25],
+        split_ratio=[.9, .1, .1],
 
         # Model parameters
         directory_model="/nfs/staff-hdd/charpent/dynamic-graff/",
@@ -92,11 +92,11 @@ def run(# Dataset parameters,
 
     early_stopping = EarlyStopping(monitor='val_acc',
                                    patience=patience,
-                                   mode="min",
+                                   mode="max",
                                    check_finite=True)
     checkpoint_callback = ModelCheckpoint(monitor='val_acc',
                                           save_top_k=1,
-                                          mode="min",
+                                          mode="max",
                                           every_n_epochs=1,
                                           dirpath=model_path,
                                           filename='model-{epoch:02d}-{validation_loss:.2f}')
