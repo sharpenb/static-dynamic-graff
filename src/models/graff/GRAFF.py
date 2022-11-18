@@ -9,7 +9,7 @@ from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from src.models.graff.GRAFFConv import GRAFFConv
 
 class GRAFF(pl.LightningModule):
-    def __init__(self, input_dim, hidden_dim, output_dim, n_encoder_layers, n_layers, n_decoder_layers, W_type, omega_type, Q_type, tau, dropout, lr, weight_decay, seed, evaluator=None):
+    def __init__(self, input_dim, hidden_dim, output_dim, n_encoder_layers, n_layers, n_decoder_layers, omega_type, Q_type, tau, dropout, lr, weight_decay, seed, W_type, temporal_type="static", space_type=None, evaluator=None):
         super().__init__()
         self.save_hyperparameters()
         torch.cuda.manual_seed(seed)
@@ -21,12 +21,23 @@ class GRAFF(pl.LightningModule):
                            num_layers=n_encoder_layers,
                            dropout=dropout,)
         self.graff_steps = torch.nn.ModuleList()
-        for _ in range(n_layers):
-            self.graff_steps.append(GRAFFConv(hidden_dim=hidden_dim,
+        if self.hparams.temporal_type == 'static':
+            graff_step = GRAFFConv(hidden_dim=hidden_dim,
                                               W_type=W_type,
                                               omega_type=omega_type,
                                               Q_type=Q_type,
-                                              tau=tau))
+                                              tau=tau)
+            for _ in range(n_layers):
+                self.graff_steps.append(graff_step)
+        elif self.hparams.temporal_type == 'dynamic':
+            for _ in range(n_layers):
+                self.graff_steps.append(GRAFFConv(hidden_dim=hidden_dim,
+                                                  W_type=W_type,
+                                                  omega_type=omega_type,
+                                                  Q_type=Q_type,
+                                                  tau=tau))
+        else:
+            raise NotImplementedError
         self.decoder = MLP(in_channels=hidden_dim,
                            hidden_channels=hidden_dim,
                            out_channels=output_dim,
