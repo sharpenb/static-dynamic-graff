@@ -53,12 +53,16 @@ class GRAFFConv(nn.Module):
             self.omega_base = 1
         elif self.omega_type == "scalar":
             self.omega_base = nn.Parameter(torch.ones(1))
+        elif self.omega_type == "diag":
+            self.omega_base = nn.Parameter(torch.ones(self.hidden_dim))
         else:
             raise ValueError(f"Omega type {self.omega_type} not implemented")
 
     def _get_omega(self, device):
         if self.omega_type in ["identity", "scalar"]:
             omega = self.omega_base * torch.eye(self.hidden_dim, device=device)
+        elif self.omega_type == "diag":
+            omega = torch.diag(self.omega_base)
         else:
             raise ValueError(f"Omega type {self.omega_type} not implemented")
 

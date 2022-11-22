@@ -7,9 +7,10 @@ from torch_sparse import SparseTensor
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 
 from src.models.graff.GRAFFConv import GRAFFConv
+from src.models.graff.Orthogonal import Orthogonal
 
 class GRAFF(pl.LightningModule):
-    def __init__(self, input_dim, hidden_dim, output_dim, n_encoder_layers, n_layers, n_decoder_layers, omega_type, Q_type, tau, dropout, lr, weight_decay, seed, W_type, temporal_type="static", space_type=None, evaluator=None):
+    def __init__(self, input_dim, hidden_dim, output_dim, n_encoder_layers, n_layers, n_decoder_layers, omega_type, Q_type, tau, dropout, lr, weight_decay, seed, W_type, spectral_type=None, temporal_type="static", space_type=None, evaluator=None):
         super().__init__()
         self.save_hyperparameters()
         torch.cuda.manual_seed(seed)
@@ -20,13 +21,15 @@ class GRAFF(pl.LightningModule):
                            out_channels=hidden_dim,
                            num_layers=n_encoder_layers,
                            dropout=dropout,)
+        if self.hparams.spectral_type is not None:
+            self.orthogonal_step = Orthogonal(hidden_dim=hidden_dim, orthogonal_map=self.hparams.spectral_type)
         self.graff_steps = torch.nn.ModuleList()
         if self.hparams.temporal_type == 'static':
             graff_step = GRAFFConv(hidden_dim=hidden_dim,
-                                              W_type=W_type,
-                                              omega_type=omega_type,
-                                              Q_type=Q_type,
-                                              tau=tau)
+                                   W_type=W_type,
+                                   omega_type=omega_type,
+                                   Q_type=Q_type,
+                                   tau=tau)
             for _ in range(n_layers):
                 self.graff_steps.append(graff_step)
         elif self.hparams.temporal_type == 'dynamic':
@@ -48,12 +51,16 @@ class GRAFF(pl.LightningModule):
         norm_adj = gcn_norm(adj_t.t())
 
         x = self.encoder(x)
+        if self.hparams.spectral_type is not None:
+            self.orthogonal_step.forward(x)
         x_0 = x
         for i, graff_step in enumerate(self.graff_steps[:-1]):
             x = graff_step(x, x_0, norm_adj)
             # x = F.relu(x)
             x = F.dropout(x, p=self.hparams.dropout, training=self.training)
         x = self.graff_steps[-1](x, x_0, norm_adj)
+        if self.hparams.spectral_type is not None:
+            self.orthogonal_step.inverse(x)
         x = self.decoder(x)
         return x.log_softmax(dim=-1)
 

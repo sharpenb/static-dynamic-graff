@@ -7,16 +7,18 @@ from torch_geometric.datasets import (
     WikipediaNetwork,
 )
 from torch.utils.data import DataLoader
+from torch_geometric.utils import to_undirected, add_self_loops
 from pytorch_lightning import LightningDataModule
 
 from src.datasets.NodeClassificationDataset import NodeClassificationDataset
-# TODO: check that dataset is loaded only if not already downloaded
 
 
 class WikipediaNetworkDataModule(LightningDataModule):
     def __init__(self,
                  name,
                  data_dir,
+                 directed,
+                 self_loops,
                  split_type,
                  split_index,
                  split_ratio,
@@ -27,6 +29,8 @@ class WikipediaNetworkDataModule(LightningDataModule):
         self.output_dim = None
         self.n_nodes = None
         self.data_dir = data_dir
+        self.directed = directed
+        self.self_loops = self_loops
         self.split_type = split_type
         self.split_index = split_index
         self.split_ratio = split_ratio
@@ -51,6 +55,10 @@ class WikipediaNetworkDataModule(LightningDataModule):
         else:
             raise NotImplementedError
         edge_index = dataset.data.edge_index
+        if not self.directed:
+            edge_index = to_undirected(edge_index)
+        if self.self_loops:
+            edge_index, _ = add_self_loops(edge_index)
         x = dataset.data.x
         y = dataset.data.y.unsqueeze(-1)
 
