@@ -28,4 +28,4 @@ For more detail see [official instructions](https://wandb.ai/quickstart/pytorch)
 
 For more detail on seml see [official instructions](https://github.com/TUM-DAML/seml).
 
-For more detail on ray-tune see [officialt instructions](https://docs.ray.io/en/latest/tune/index.html).
+For more detail on ray-tune see [official instructions](https://docs.ray.io/en/latest/tune/index.html).
