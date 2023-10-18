@@ -11,8 +11,8 @@ Transactions on Machine Learning Research  (TMLR), 2023.
 ## Setup
 
 ```{bash}
-conda create -n dynamic_graff -c pytorch -c conda-forge pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.6 python=3.9 pip
-conda activate dynamic_graff
+conda create -n graff -c pytorch -c conda-forge pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.6 python=3.9 pip
+conda activate graff
 conda install pyg -c pyg
 pip install ogb
 pip install wandb
